@@ -1,0 +1,24 @@
+#!/bin/sh
+
+#killall bashpad
+
+pgrep -x bashtop && exit 0 
+
+# Location of the virtual mic
+VIRTUAL_MIC="${XDG_HOME_DIR:-$HOME}/.local/share/bashpad/virtualmic"
+SOUNDS="${XDG_HOME_DIR:-$HOME}/.local/share/bashpad/sounds"
+
+# Default input
+DEFAULT_MIC=alsa_input.usb-GeneralPlus_USB_Audio_Device-00.mono-fallback
+FILE="$(ls "$SOUNDS" | grep "^$1")"
+pactl set-default-source "$DEFAULT_MIC"
+
+# Make the new virtual source if it doesn't exist already
+[ -z "$(pactl list | grep bashpad)" ] && pactl load-module module-pipe-source source_name=bashpad file="$VIRTUAL_MIC" format=s16le rate=16000 channels=1
+
+# Set the virtual source as default, 
+#  play the sound and come back to the default source
+
+pactl set-default-source virtmic
+ffmpeg -y -re -i "$SOUNDS/$FILE" -f s16le -ar 16000 -ac 1 "$VIRTUAL_MIC"
+pactl set-default-source "$DEFAULT_MIC"
