@@ -9,7 +9,7 @@ shell version of a soundpad, mostly to be toxic in games.
 As hard as `make install`
 
 ## Usage
-You should have your sound files located in `~/.local/share/shellpad/sounds`,
+You should have your sound files located in `~/.local/share/shellpad/sounds`, some files are there already as examples
 each one starting with a unique number, then run the command `shellpad <number>` to run it.
 
 It's recommended to bind the commands to some key handler program, like `sxhkd`.
