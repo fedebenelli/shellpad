@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# Location of the virtual mic
 DEFAULT_MIC="$(pacmd list-sources | grep -A 1 '\* index:' | grep -o "<.*>" | sed 's,[<>],,g')"
 VIRTUAL_MIC="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/virtualmic"
 SOUNDS="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/sounds"
