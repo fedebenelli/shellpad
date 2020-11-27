@@ -8,6 +8,13 @@ PIPE_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/pipeid"
 LOOP_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/loopid"
 SOUND_FILE="$(ls "$SOUNDS" | grep "^$1-")"
 
+[ -z "$1" ] &&
+	echo "$(basename $0)
+
+USAGE:
+You should have your sound files located in $SOUNDS, each one starting with a unique number, then run the command \`shellpad <number>\` to run it.
+It's recommended to bind the commands to some key handler program, like \`sxhkd\`." && exit 0
+
 
 # If the script it's allready running unload the previous process modules and continue
 [ "$(pidof -x $(basename $0) -o %PPID)" ] &&
