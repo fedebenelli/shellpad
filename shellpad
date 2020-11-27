@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# Location of the virtual mic
+DEFAULT_MIC="$(pacmd list-sources | grep -A 1 '\* index:' | grep -o "<.*>" | sed 's,[<>],,g')"
+VIRTUAL_MIC="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/virtualmic"
+SOUNDS="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/sounds"
+PIPE_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/pipeid"
+LOOP_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/loopid"
+SOUND_FILE="$(ls "$SOUNDS" | grep "^$1-")"
+
+
+# If the script it's allready running unload the previous process modules and continue
+[ "$(pidof -x $(basename $0) -o %PPID)" ] &&
+	(echo "already running"
+	pactl set-default-source "$DEFAULT_MIC"
+	for module in $(cat "$PIPE_FILE" "$LOOP_FILE"); do
+		pactl unload-module $module
+	done
+	rm "$VIRUTAL_MIC")
+
+# Load the modules and save their ids to files
+pipeid=$(pactl load-module module-pipe-source source_name=shellpad file="$VIRTUAL_MIC" format=s16le rate=16000 channels=1)
+loopid=$(pactl load-module module-loopback source=shellpad)
+echo $pipeid > "$PIPE_FILE"
+echo $loopid > "$LOOP_FILE"
+
+# Set the virtual source as default, 
+#  play the sound and come back to the default source
+pactl set-default-source shellpad
+pactl set-source-volume shellpad 50%
+ffmpeg -y -re -i "$SOUNDS/$SOUND_FILE" -f s16le -ar 16000 -ac 1 "$VIRTUAL_MIC"
+pactl set-default-source "$DEFAULT_MIC"
+
+echo Unloading pipe module: $pipeid
+pactl unload-module $pipeid
+echo Unloading loopback module: $loopid
+pactl unload-module $loopid
+exit 0
