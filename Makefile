@@ -11,5 +11,5 @@ install:
 	@echo Installation finished, probably.
 uninstall:
 	@rm -vf ${DESTDIR}/bin/shellpad
-	@rm -vr ${DESDIR}/share/shellpad
+	@rm -vr ${DESTDIR}/share/shellpad
 	@echo Done (done?) uninstalling.
