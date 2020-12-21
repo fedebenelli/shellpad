@@ -1,15 +1,24 @@
 #!/bin/sh
 
 DEFAULT_MIC="$(pacmd list-sources | grep -A 1 '\* index:' | grep -o "<.*>" | sed 's,[<>],,g')"
+DEFAULT_SINK="$(pacmd list-sinks | grep -A 1 '\* index:' | grep -o "<.*>" | sed 's,[<>],,g')"
 VIRTUAL_MIC="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/virtualmic"
 SOUNDS="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/sounds"
 PIPE_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/pipeid"
 LOOP_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/loopid"
 SOUND_FILE="$(ls "$SOUNDS" | grep "^$1-")"
 
+function unload() {
+	echo "already running"
+	pactl set-default-source "$DEFAULT_MIC"
+	for module in $(cat "$PIPE_FILE" "$LOOP_FILE"); do
+		pactl unload-module $module
+	done
+}
+
+
 if [ -z "$1" ]; then
 	echo "$(basename $0)
-
 	USAGE:
 	You should have your sound files located in $SOUNDS, each one starting with a unique number, then run the command \`shellpad <number>\` to run it.
 	It's recommended to bind the commands to some key handler program, like \`sxhkd\`."
@@ -17,19 +26,17 @@ if [ -z "$1" ]; then
 fi
 
 
+[ $1='cancel' ] && $(unload) && exit 0
+
 # If the script it's allready running unload the previous process modules and continue
-if [ "$(pidof -x $(basename $0) -o %PPID)" ]; then
-	echo "already running"
-	pactl set-default-source "$DEFAULT_MIC"
-	for module in $(cat "$PIPE_FILE" "$LOOP_FILE"); do
-		pactl unload-module $module
-	done
-	rm "$VIRUTAL_MIC"
-fi
+[ "$(pidof -x $(basename $0) -o %PPID)" ] && $(unload)
+
+# Remove the virtual mic file in case the module is bugged
+rm "$VIRUTAL_MIC"
 
 # Load the modules and save their ids to files
 pipeid=$(pactl load-module module-pipe-source source_name=shellpad file="$VIRTUAL_MIC" format=s16le rate=16000 channels=1)
-loopid=$(pactl load-module module-loopback source=shellpad)
+loopid=$(pactl load-module module-loopback source=shellpad sink="$DEFAULT_SINK")
 echo $pipeid > "$PIPE_FILE"
 echo $loopid > "$LOOP_FILE"
 
@@ -44,4 +51,5 @@ echo Unloading pipe module: $pipeid
 pactl unload-module $pipeid
 echo Unloading loopback module: $loopid
 pactl unload-module $loopid
+
 exit 0
