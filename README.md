@@ -2,7 +2,7 @@
 shell version of a soundpad, mostly to be toxic in games.
 
 ## Dependencies
-* `pulseaudio`
+* `pulseaudio/pipewire`
 * `ffmpeg`
 
 ## Instalation
