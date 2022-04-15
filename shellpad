@@ -1,5 +1,49 @@
 #!/bin/sh
 
+# =========================================================================={{{
+#  Functions
+# -----------------------------------------------------------------------------
+unload() {
+	echo "already running"
+	pactl set-default-source "$DEFAULT_MIC"
+	for module in $(cat "$PIPE_FILE" "$LOOP_FILE"); do
+		pactl unload-module $module
+	done
+}
+
+show_help() {
+    echo "$HELP"
+    exit 0
+}
+
+load_modules() {
+    echo "Loading Virtual Source"
+    pipeid=$(pactl load-module module-pipe-source source_name=shellpad file="$VIRTUAL_MIC" format=s16le rate=16000 channels=1)
+    
+    echo "Loading Virtual Sink"
+    loopid=$(pactl load-module module-loopback source=shellpad sink="$DEFAULT_SINK")
+    echo $pipeid > "$PIPE_FILE"
+    echo $loopid > "$LOOP_FILE"
+}
+
+set_default(){
+    echo "Setting default source as $1 with volume $2"
+    pactl set-default-source "$1"
+    [ -z "$2" ] || pactl set-source-volume "$1" "$2"
+}
+
+unload_modules(){
+    echo Unloading pipe module: $pipeid
+    pactl unload-module $pipeid
+    echo Unloading loopback module: $loopid
+    pactl unload-module $loopid
+}
+# ==========================================================================}}}
+
+
+# =========================================================================={{{
+#  Global variables
+# -----------------------------------------------------------------------------
 DEFAULT_MIC=$(pactl info | grep "Default Source:" | sed 's/Default Source: //g')
 DEFAULT_SINK=$(pactl info | grep "Default Sink:" | sed 's/Default Source: //g')
 VIRTUAL_MIC="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/virtualmic"
@@ -8,26 +52,20 @@ PIPE_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/pipeid"
 LOOP_FILE="${XDG_HOME_DIR:-$HOME}/.local/share/shellpad/loopid"
 SOUND_FILE="$(ls "$SOUNDS" | grep "^$1-")"
 
+HELP="$(basename $0)
 
-function unload() {
-	echo "already running"
-	pactl set-default-source "$DEFAULT_MIC"
-	for module in $(cat "$PIPE_FILE" "$LOOP_FILE"); do
-		pactl unload-module $module
-	done
-}
+USAGE:
+You should have your sound files located in $SOUNDS, each one starting
+with a unique number, then run the command \`shellpad <number>\` to run
+it.  It's recommended to bind the commands to some key handler program,
+like \`sxhkd\`."
+# ==========================================================================}}}
 
 
-if [ -z "$1" ]; then
-	echo "$(basename $0)
-	USAGE:
-	You should have your sound files located in $SOUNDS, each one starting
-	with a unique number, then run the command \`shellpad <number>\` to run
-	it.  It's recommended to bind the commands to some key handler program,
-	like \`sxhkd\`."
-	exit 0
-fi
-
+# =========================================================================={{{
+#  Main program
+# -----------------------------------------------------------------------------
+[ -z "$1" ] && show_help 
 
 [ $1 = 'cancel' ] && unload && exit 0
 
@@ -38,26 +76,20 @@ fi
 rm "$VIRTUAL_MIC"
 
 # Load the modules and save their ids to files
-echo "Loading Virtual Source"
-pipeid=$(pactl load-module module-pipe-source source_name=shellpad file="$VIRTUAL_MIC" format=s16le rate=16000 channels=1)
-echo "Loading Virtual Sink"
-loopid=$(pactl load-module module-loopback source=shellpad sink="$DEFAULT_SINK")
-echo $pipeid > "$PIPE_FILE"
-echo $loopid > "$LOOP_FILE"
+load_modules
 
-# Set the virtual source as default, 
-#  play the sound and come back to the default source
-echo "Setting default source as shellpad"
-pactl set-default-source shellpad
-pactl set-source-volume shellpad 100%
-ffmpeg -y -re -i "$SOUNDS/$SOUND_FILE" -f s16le -ar 16000 -ac 1 "$VIRTUAL_MIC"
+# Set the virtual source as default, play the sound and come back to the default source
+set_default "shellpad" "100%"
+
+# Play the sound
+echo "Playing ${SOUND_FILE}"
+ffmpeg -hide_banner -loglevel error -y -re -i "$SOUNDS/$SOUND_FILE" -f s16le -ar 16000 -ac 1 "$VIRTUAL_MIC"
+
+# Back to defaults
 echo "Going back to default mic"
-pactl set-default-source "$DEFAULT_MIC"
+set_default "$DEFAULT_MIC"
 
-echo Unloading pipe module: $pipeid
-pactl unload-module $pipeid
-echo Unloading loopback module: $loopid
-pactl unload-module $loopid
+unload_modules
 
 exit 0
-
+# ==========================================================================}}}
